@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from app.database import engine, Base, get_db
-import app.routes
+import app.routes as routes_module
 from app.routes import notes, ai, billing
 # Start imports for viv-auth and viv-pay
 from viv_auth import init_auth
@@ -27,15 +27,15 @@ User, require_auth = init_auth(app, engine, Base, get_db, app_name="AI Notes")
 create_checkout, get_customer, require_subscription = init_pay(app, engine, Base, get_db, app_name="AI Notes")
 
 # Inject dependencies into routes module
-app.routes.User = User
-app.routes.require_auth = require_auth
-app.routes.require_subscription = require_subscription
-app.routes.create_checkout = create_checkout
-app.routes.get_customer = get_customer
+routes_module.User = User
+routes_module.require_auth = require_auth
+routes_module.require_subscription = require_subscription
+routes_module.create_checkout = create_checkout
+routes_module.get_customer = get_customer
 
 # Override dependency getters
-app.dependency_overrides[app.routes.get_current_user] = require_auth
-app.dependency_overrides[app.routes.get_active_subscription] = require_subscription
+app.dependency_overrides[routes_module.get_current_user] = require_auth
+app.dependency_overrides[routes_module.get_active_subscription] = require_subscription
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
