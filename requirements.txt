@@ -6,4 +6,4 @@ psycopg2-binary==2.9.9
 python-multipart==0.0.6
 google-genai==1.62.0
 git+https://github.com/ooda-AI-GB/viv-auth.git
-git+https://github.com/ooda-AI-GB/viv-pay.git
+git+https://github.com/ooda-AI-GB/viv-pay.git@854f785
