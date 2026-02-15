@@ -1,0 +1,26 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>My Notes</h1>
+    <a href="/notes/new" class="btn btn-primary">+ New Note</a>
+</div>
+
+{% if notes %}
+<div class="notes-grid">
+    {% for note in notes %}
+    <a href="/notes/{{ note.id }}" class="note-card card">
+        <div class="note-title">{{ note.title }}</div>
+        <div class="note-preview">{{ note.content[:100] }}...</div>
+        <div class="note-meta">Updated: {{ note.updated_at.strftime('%Y-%m-%d') }}</div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <p>You don't have any notes yet.</p>
+    <a href="/notes/new" class="btn btn-primary">Create your first note</a>
+</div>
+{% endif %}
+
+{% endblock %}

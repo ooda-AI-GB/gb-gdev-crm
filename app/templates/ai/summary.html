@@ -1,0 +1,67 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>AI Summary</h1>
+</div>
+
+<div style="max-width: 800px; margin: 0 auto; text-align: center;">
+    <p style="margin-bottom: 2rem; color: var(--text-secondary);">
+        Generate an AI-powered summary of all your notes. Identify key themes and action items instantly.
+    </p>
+
+    <button id="summarize-btn" class="btn btn-primary" style="font-size: 1.2rem; padding: 1rem 2rem;">
+        ✨ Summarize My Notes
+    </button>
+
+    <div id="loading" style="display: none; margin-top: 2rem; color: var(--text-secondary);">
+        <p>Analyzing your notes...</p>
+    </div>
+
+    <div id="error-msg" style="display: none; margin-top: 2rem; color: var(--danger); padding: 1rem; border: 1px solid var(--danger); border-radius: 6px; background: #fee2e2;"></div>
+
+    <div id="result-card" class="card" style="display: none; margin-top: 2rem; text-align: left;">
+        <h2>Summary</h2>
+        <div id="summary-content" style="white-space: pre-wrap; line-height: 1.6;"></div>
+    </div>
+</div>
+
+<script>
+    const btn = document.getElementById('summarize-btn');
+    const loading = document.getElementById('loading');
+    const resultCard = document.getElementById('result-card');
+    const summaryContent = document.getElementById('summary-content');
+    const errorMsg = document.getElementById('error-msg');
+
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.innerText = "Summarizing...";
+        loading.style.display = 'block';
+        resultCard.style.display = 'none';
+        errorMsg.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/notes/summarize', {
+                method: 'POST'
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                summaryContent.innerText = data.summary;
+                resultCard.style.display = 'block';
+            } else {
+                errorMsg.innerText = data.error || "An error occurred";
+                errorMsg.style.display = 'block';
+            }
+        } catch (err) {
+            errorMsg.innerText = "Network error. Please try again.";
+            errorMsg.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "✨ Summarize My Notes";
+            loading.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

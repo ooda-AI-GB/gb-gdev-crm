@@ -1,0 +1,35 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>Pricing</h1>
+</div>
+
+<div class="pricing-grid">
+    <div class="plan-card">
+        <div class="plan-title">Free</div>
+        <div class="plan-price">$0 / month</div>
+        <ul class="features-list">
+            <li>Unlimited notes</li>
+            <li>Create, edit, delete</li>
+            <li>3 sample notes</li>
+            <li>Secure storage</li>
+        </ul>
+        <a href="/auth/login" class="btn btn-outline" style="width: 100%; display: block; text-align: center;">Get Started</a>
+    </div>
+
+    <div class="plan-card premium">
+        <div class="plan-title">Premium</div>
+        <div class="plan-price">$9 / month</div>
+        <ul class="features-list">
+            <li>Everything in Free</li>
+            <li>AI Summarization</li>
+            <li>AI Chat (Coming Soon)</li>
+            <li>Priority Support</li>
+        </ul>
+        <form action="/subscribe" method="post">
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Subscribe</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

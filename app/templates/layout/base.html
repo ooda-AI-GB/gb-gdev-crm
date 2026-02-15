@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Notes</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">AI Notes</div>
+        <div class="nav-links">
+            <a href="/notes" class="nav-link {% if request.url.path.startswith('/notes') %}active{% endif %}">
+                📝 Notes
+            </a>
+            <a href="/ai/summary" class="nav-link {% if request.url.path.startswith('/ai') %}active{% endif %}">
+                ✨ AI Summary
+            </a>
+            <a href="/pricing" class="nav-link {% if request.url.path.startswith('/pricing') %}active{% endif %}">
+                💎 Pricing
+            </a>
+        </div>
+        {% if user %}
+        <div class="user-section">
+            <div class="user-email">{{ user.email }}</div>
+            <a href="/auth/logout" class="logout-link">Log out</a>
+        </div>
+        {% else %}
+        <div class="user-section">
+            <a href="/auth/login" class="nav-link">Log in</a>
+        </div>
+        {% endif %}
+    </div>
+    <div class="main-content">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
