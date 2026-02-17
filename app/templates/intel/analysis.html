@@ -1,27 +1,149 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<style>
+.intel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+.intel-box { background: var(--bg-secondary, #f8f9fa); padding: 1rem; border-radius: 6px; border: 1px solid var(--border); }
+.intel-box h4 { margin-top: 0; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.intel-box ul { padding-left: 1.2rem; margin: 0; }
+.intel-box li { margin-bottom: 0.25rem; }
+.intel-section { margin-top: 2rem; }
+.intel-section h3 { border-bottom: 2px solid var(--primary-color, #007bff); display: inline-block; padding-bottom: 0.25rem; }
+.spinner { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+@media (max-width: 768px) { .intel-grid { grid-template-columns: 1fr; } }
+</style>
+
 <div class="top-bar">
     <h1>Analysis: {{ analysis.company_name }}</h1>
-    <a href="/intel" class="btn btn-outline">Back to Intel</a>
+    <div style="display: flex; gap: 0.5rem;">
+        <button onclick="refreshAnalysis({{ analysis.id }})" class="btn btn-outline" id="refreshBtn">
+            🔄 Refresh Analysis
+        </button>
+        <a href="/intel" class="btn btn-outline">Back to Intel</a>
+    </div>
 </div>
 
 <div class="card">
-    <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem;">
+    <div style="display: flex; gap: 2rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; flex-wrap: wrap;">
         <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">TYPE</div>
-            <div style="font-weight: 500;">{{ analysis.analysis_type|upper }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Type</div>
+            <div style="font-weight: 600;">{{ analysis.analysis_type|upper }}</div>
         </div>
         <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">DATE</div>
-            <div style="font-weight: 500;">{{ analysis.generated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Date</div>
+            <div style="font-weight: 600;">{{ analysis.generated_at.strftime('%Y-%m-%d %H:%M') }}</div>
         </div>
         <div>
-            <div style="font-size: 0.85rem; color: var(--text-secondary);">MODEL</div>
-            <div style="font-weight: 500;">{{ analysis.model_used }}</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Model</div>
+            <div style="font-weight: 600;">{{ analysis.model_used }}</div>
         </div>
+        {% if analysis.analysis_version %}
+        <div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Version</div>
+            <div style="font-weight: 600;">{{ analysis.analysis_version }}</div>
+        </div>
+        {% endif %}
     </div>
     
-    <div style="white-space: pre-wrap; line-height: 1.6; font-family: monospace;">{{ analysis.content }}</div>
+    {% if structured_data %}
+        <!-- Executive Summary -->
+        <div class="intel-section" style="margin-top: 0;">
+            <h3>Executive Summary</h3>
+            <p style="font-size: 1.1rem; line-height: 1.6;">{{ structured_data.executive_summary }}</p>
+        </div>
+
+        <!-- SWOT Analysis -->
+        <div class="intel-section">
+            <h3>SWOT Analysis</h3>
+            <div class="intel-grid">
+                <div class="intel-box" style="border-left: 4px solid #28a745;">
+                    <h4>Strengths</h4>
+                    <ul>
+                        {% for item in structured_data.strengths %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="intel-box" style="border-left: 4px solid #dc3545;">
+                    <h4>Weaknesses</h4>
+                    <ul>
+                        {% for item in structured_data.weaknesses %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="intel-box" style="border-left: 4px solid #007bff;">
+                    <h4>Opportunities</h4>
+                    <ul>
+                        {% for item in structured_data.opportunities %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="intel-box" style="border-left: 4px solid #ffc107;">
+                    <h4>Threats</h4>
+                    <ul>
+                        {% for item in structured_data.threats %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommended Actions -->
+        <div class="intel-section">
+            <h3>Recommended Actions</h3>
+            <div style="background: var(--bg-secondary, #e9ecef); padding: 1.5rem; border-radius: 8px;">
+                <ul style="font-size: 1.05rem; margin: 0; padding-left: 1.5rem;">
+                    {% for action in structured_data.recommended_actions %}
+                    <li style="margin-bottom: 0.5rem;">{{ action }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Competitor Comparison -->
+        <div class="intel-section">
+            <h3>Competitor Comparison</h3>
+            <div style="white-space: pre-wrap; font-family: monospace; line-height: 1.5; background: var(--bg-secondary, #f8f9fa); padding: 1rem; border-radius: 6px; overflow-x: auto;">{{ structured_data.competitor_comparison }}</div>
+        </div>
+
+    {% else %}
+        <div style="white-space: pre-wrap; line-height: 1.6; font-family: monospace;">{{ analysis.content }}</div>
+    {% endif %}
 </div>
+
+<script>
+async function refreshAnalysis(id) {
+    if (!confirm("Re-run analysis with latest AI model? This will overwrite the current report.")) return;
+    
+    const btn = document.getElementById('refreshBtn');
+    const originalContent = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner">⏳</span> Generating...';
+    
+    try {
+        const response = await fetch(`/api/intel/${id}/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            alert('Error: ' + (data.error || 'Refresh failed'));
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error refreshing analysis');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
+}
+</script>
 {% endblock %}

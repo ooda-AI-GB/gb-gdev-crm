@@ -96,6 +96,7 @@ class CompanyIntel(Base):
     model_used = Column(String, nullable=True)
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     requested_by = Column(String, nullable=True)
+    analysis_version = Column(String, nullable=True) # "2.0" for new structured output
 
 class Notification(Base):
     __tablename__ = "notifications"

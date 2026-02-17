@@ -1,6 +1,10 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<style>
+.spinner { animation: spin 1s linear infinite; display: inline-block; margin-right: 5px; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+</style>
 <div class="top-bar">
     <h1>Company Intelligence</h1>
     <button onclick="document.getElementById('analyzeModal').showModal()" class="btn btn-primary">✨ New Analysis</button>
@@ -69,8 +73,8 @@
         }
         
         const btn = event.target;
-        const originalText = btn.innerText;
-        btn.innerText = "Analyzing...";
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner">⏳</span> Analyzing...';
         btn.disabled = true;
 
         try {
@@ -96,7 +100,7 @@
             alert('Error requesting analysis');
             console.error(error);
         } finally {
-            btn.innerText = originalText;
+            btn.innerHTML = originalText;
             btn.disabled = false;
         }
     }
