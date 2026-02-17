@@ -6,6 +6,9 @@ from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Contact, Deal, Activity
 import app.routes as routes_module
+import os
+import resend
+from datetime import datetime
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -102,6 +105,7 @@ async def create_contact(
 async def view_contact(
     request: Request,
     id: int,
+    message: str = Query(None),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
@@ -115,7 +119,8 @@ async def view_contact(
         "contact": contact, 
         "user": user,
         "deals": contact.deals,
-        "activities": contact.activities
+        "activities": contact.activities,
+        "message": message
     })
 
 @router.get("/contacts/{id}/edit", response_class=HTMLResponse)
@@ -179,3 +184,47 @@ async def delete_contact(
         db.delete(contact)
         db.commit()
     return RedirectResponse(url="/contacts", status_code=303)
+
+@router.post("/contacts/{id}/email")
+async def send_email_contact(
+    request: Request,
+    id: int,
+    subject: str = Form(...),
+    body: str = Form(...),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    contact = db.query(Contact).filter(Contact.id == id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    # Create activity first
+    activity = Activity(
+        contact_id=contact.id,
+        type="email",
+        subject=subject,
+        description=body,
+        date=datetime.now(),
+        completed=True
+    )
+    db.add(activity)
+    db.commit()
+
+    # Send email
+    resend_api_key = os.environ.get("RESEND_API_KEY")
+    if resend_api_key:
+        try:
+            resend.api_key = resend_api_key
+            resend.Emails.send({
+                "from": os.environ.get("FROM_EMAIL", "noreply@send.gigabox.ai"),
+                "to": contact.email,
+                "subject": subject,
+                "html": f"<p>{body}</p>"
+            })
+        except Exception as e:
+            print(f"[EMAIL-ERROR] Failed to send email: {e}")
+    else:
+        print(f"[EMAIL-DEV] To: {contact.email}, Subject: {subject}, Body: {body}")
+
+    return RedirectResponse(url=f"/contacts/{id}?message=Email+sent+successfully", status_code=303)
