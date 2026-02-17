@@ -3,8 +3,18 @@
 {% block content %}
 <div class="top-bar">
     <h1>Contacts</h1>
-    <a href="/contacts/new" class="btn btn-primary">+ New Contact</a>
+    <div style="display: flex; gap: 0.5rem;">
+        <button onclick="document.getElementById('importModal').showModal()" class="btn btn-outline">Import CSV</button>
+        <a href="/contacts/export" class="btn btn-outline">Export All</a>
+        <a href="/contacts/new" class="btn btn-primary">+ New Contact</a>
+    </div>
 </div>
+
+{% if message %}
+<div style="background: #dcfce7; color: #15803d; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+    {{ message }}
+</div>
+{% endif %}
 
     <style>
         .floating-action-bar {
@@ -230,5 +240,21 @@
             window.location.href = `/contacts/export?ids=${ids.join(',')}`;
         }
     </script>
+
+<dialog id="importModal" style="border: none; border-radius: 8px; padding: 0; max-width: 500px; width: 100%;">
+    <div style="padding: 1.5rem;">
+        <h3 style="margin-top: 0;">Import Contacts</h3>
+        <p>Upload a CSV file to import contacts.</p>
+        <form action="/contacts/import" method="post" enctype="multipart/form-data">
+            <div class="form-group">
+                <input type="file" name="file" accept=".csv" required style="width: 100%; margin-bottom: 1rem;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+                <button type="button" onclick="document.getElementById('importModal').close()" class="btn btn-outline">Cancel</button>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </div>
+        </form>
+    </div>
+</dialog>
 
 {% endblock %}

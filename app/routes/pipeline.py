@@ -1,12 +1,14 @@
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Deal, Contact
 import app.routes as routes_module
-from datetime import date
+from datetime import date, datetime
+import csv
+import io
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -105,3 +107,39 @@ async def move_deal(
     # Given typical "board" interactions, I'll return JSON if it looks like an API call, or redirect if form submit.
     # Actually, let's just return a simple JSON response as it's likely consumed by JS.
     return JSONResponse({"status": "success", "new_stage": stage})
+
+@router.get("/pipeline/export")
+async def export_deals(
+    request: Request,
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    deals = db.query(Deal).join(Contact).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(["ID", "Title", "Contact Name", "Value", "Currency", "Stage", "Probability", "Expected Close", "Notes", "Created At"])
+    
+    for deal in deals:
+        writer.writerow([
+            deal.id,
+            deal.title,
+            deal.contact.name,
+            deal.value,
+            deal.currency,
+            deal.stage,
+            deal.probability,
+            deal.expected_close,
+            deal.notes,
+            deal.created_at
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=deals_export_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"}
+    )
+

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, Body, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -9,10 +9,12 @@ import app.routes as routes_module
 import os
 import resend
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 import csv
 import io
+import json
+import uuid
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -24,6 +26,7 @@ async def list_contacts(
     status: str = Query(None),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
+    message: str = Query(None),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
@@ -61,7 +64,8 @@ async def list_contacts(
         "q": q,
         "status": status,
         "sort": sort,
-        "order": order
+        "order": order,
+        "message": message
     })
 
 @router.get("/contacts/new", response_class=HTMLResponse)
@@ -282,17 +286,19 @@ async def bulk_delete(
 @router.get("/contacts/export")
 async def export_contacts(
     request: Request,
-    ids: str = Query(...),
+    ids: str = Query(None),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
 ):
-    try:
-        id_list = [int(id) for id in ids.split(',')]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid IDs provided")
-    
-    contacts = db.query(Contact).filter(Contact.id.in_(id_list)).all()
+    if ids:
+        try:
+            id_list = [int(id) for id in ids.split(',')]
+            contacts = db.query(Contact).filter(Contact.id.in_(id_list)).all()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid IDs provided")
+    else:
+        contacts = db.query(Contact).all()
     
     output = io.StringIO()
     writer = csv.writer(output)
@@ -321,4 +327,144 @@ async def export_contacts(
         iter([output.getvalue()]),
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"}
+    )
+
+@router.post("/contacts/import")
+async def import_contacts_step1(
+    request: Request,
+    file: UploadFile = File(...),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription)
+):
+    content = await file.read()
+    try:
+        text_content = content.decode("utf-8")
+        # Save to temp file
+        file_id = str(uuid.uuid4())
+        # Use /tmp for temporary storage
+        file_path = f"/tmp/import_{file_id}.csv"
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            f.write(text_content)
+        
+        # Parse first few rows for preview
+        csv_reader = csv.reader(io.StringIO(text_content))
+        header = next(csv_reader, None)
+        if not header:
+            raise HTTPException(status_code=400, detail="Empty CSV file")
+        
+        preview_rows = []
+        for i in range(5):
+            try:
+                row = next(csv_reader)
+                preview_rows.append(row)
+            except StopIteration:
+                break
+                
+        # Auto-detect columns
+        column_mapping = {}
+        for i, col in enumerate(header):
+            col_lower = col.lower()
+            if "name" in col_lower:
+                column_mapping["name"] = i
+            elif "email" in col_lower:
+                column_mapping["email"] = i
+            elif "company" in col_lower:
+                column_mapping["company"] = i
+            elif "phone" in col_lower:
+                column_mapping["phone"] = i
+            elif "status" in col_lower:
+                column_mapping["status"] = i
+                
+        return templates.TemplateResponse("contacts/import_preview.html", {
+            "request": request,
+            "user": user,
+            "header": header,
+            "preview_rows": preview_rows,
+            "column_mapping": column_mapping,
+            "file_id": file_id
+        })
+        
+    except UnicodeDecodeError:
+         raise HTTPException(status_code=400, detail="Invalid CSV file encoding. Please use UTF-8.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing CSV: {str(e)}")
+
+@router.post("/contacts/import/confirm")
+async def import_contacts_confirm(
+    request: Request,
+    file_id: str = Form(...),
+    col_name: int = Form(...),
+    col_email: int = Form(...),
+    col_company: int = Form(-1),
+    col_phone: int = Form(-1),
+    col_status: int = Form(-1),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    file_path = f"/tmp/import_{file_id}.csv"
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=400, detail="Import session expired. Please upload again.")
+    
+    added_count = 0
+    skipped_count = 0
+    
+    try:
+        with open(file_path, "r", newline="", encoding="utf-8") as f:
+            csv_reader = csv.reader(f)
+            header = next(csv_reader, None) # Skip header
+            
+            for row in csv_reader:
+                # Safety check for index out of bounds
+                if len(row) <= max(col_name, col_email):
+                    continue
+                    
+                name = row[col_name].strip()
+                email = row[col_email].strip()
+                
+                if not email or not name:
+                    continue
+                    
+                # Check duplicate
+                existing = db.query(Contact).filter(Contact.email == email).first()
+                if existing:
+                    skipped_count += 1
+                    continue
+                
+                company = row[col_company].strip() if col_company >= 0 and len(row) > col_company else None
+                phone = row[col_phone].strip() if col_phone >= 0 and len(row) > col_phone else None
+                status_val = row[col_status].strip().lower().replace(" ", "_") if col_status >= 0 and len(row) > col_status else "lead"
+                
+                # Normalize status
+                valid_statuses = ["lead", "contacted", "proposal", "negotiation", "closed_won", "closed_lost"]
+                if status_val not in valid_statuses:
+                    status_val = "lead"
+                
+                contact = Contact(
+                    user_id=str(user.id),
+                    name=name,
+                    email=email,
+                    company=company,
+                    phone=phone,
+                    status=status_val,
+                    source="import"
+                )
+                db.add(contact)
+                added_count += 1
+            
+            db.commit()
+            
+    except Exception as e:
+        # cleanup
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail=f"Import failed: {str(e)}")
+    
+    # cleanup
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        
+    return RedirectResponse(
+        url=f"/contacts?message=Imported+{added_count}+contacts.+Skipped+{skipped_count}+duplicates.", 
+        status_code=303
     )

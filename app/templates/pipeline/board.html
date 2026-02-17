@@ -3,7 +3,10 @@
 {% block content %}
 <div class="top-bar">
     <h1>Pipeline</h1>
-    <button onclick="document.getElementById('dealModal').showModal()" class="btn btn-primary">+ New Deal</button>
+    <div style="display: flex; gap: 0.5rem;">
+        <a href="/pipeline/export" class="btn btn-outline">Export Deals</a>
+        <button onclick="document.getElementById('dealModal').showModal()" class="btn btn-primary">+ New Deal</button>
+    </div>
 </div>
 
 <form method="GET" action="/pipeline" style="display: flex; gap: 1rem; margin-bottom: 1rem;">

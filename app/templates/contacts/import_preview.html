@@ -1,0 +1,94 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>Confirm Import</h1>
+    <a href="/contacts" class="btn btn-outline">Cancel</a>
+</div>
+
+<div class="card">
+    <p>Please map the CSV columns to the contact fields. The first 5 rows are shown for preview.</p>
+    
+    <form action="/contacts/import/confirm" method="post">
+        <input type="hidden" name="file_id" value="{{ file_id }}">
+        
+        <div style="margin-bottom: 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+                <label>Name (Required)</label>
+                <select name="col_name" required>
+                    <option value="">Select Column...</option>
+                    {% for col in header %}
+                    <option value="{{ loop.index0 }}" {% if column_mapping.get('name') == loop.index0 %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Email (Required)</label>
+                <select name="col_email" required>
+                    <option value="">Select Column...</option>
+                    {% for col in header %}
+                    <option value="{{ loop.index0 }}" {% if column_mapping.get('email') == loop.index0 %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Company</label>
+                <select name="col_company">
+                    <option value="-1">Do Not Import</option>
+                    {% for col in header %}
+                    <option value="{{ loop.index0 }}" {% if column_mapping.get('company') == loop.index0 %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Phone</label>
+                <select name="col_phone">
+                    <option value="-1">Do Not Import</option>
+                    {% for col in header %}
+                    <option value="{{ loop.index0 }}" {% if column_mapping.get('phone') == loop.index0 %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+             <div class="form-group">
+                <label>Status</label>
+                <select name="col_status">
+                    <option value="-1">Default (Lead)</option>
+                    {% for col in header %}
+                    <option value="{{ loop.index0 }}" {% if column_mapping.get('status') == loop.index0 %}selected{% endif %}>{{ col }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <h3>Preview</h3>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        {% for col in header %}
+                        <th>{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in preview_rows %}
+                    <tr>
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="margin-top: 2rem; text-align: right;">
+            <button type="submit" class="btn btn-primary">Confirm Import</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
