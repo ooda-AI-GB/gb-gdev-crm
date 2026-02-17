@@ -6,6 +6,45 @@
     <a href="/contacts/new" class="btn btn-primary">+ New Contact</a>
 </div>
 
+    <style>
+        .floating-action-bar {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            z-index: 1000;
+            border: 1px solid #eee;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translate(-50%, 100%); opacity: 0; }
+            to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
+        .floating-action-bar .actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .count-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+    </style>
+
     <div class="card">
         <form method="GET" action="/contacts" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
             <input type="text" name="q" value="{{ q or '' }}" placeholder="Search contacts..." id="searchInput">
@@ -27,6 +66,9 @@
         <table>
             <thead>
                 <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="selectAll" onclick="toggleAll(this)">
+                    </th>
                     <th>
                         <a href="/contacts?sort=name&order={% if sort == 'name' and order == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}{% if status %}&status={{ status }}{% endif %}" style="color: inherit; text-decoration: none;">
                             Name {% if sort == 'name' %}{% if order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
@@ -54,6 +96,9 @@
             <tbody>
                 {% for contact in contacts %}
                 <tr>
+                    <td>
+                        <input type="checkbox" class="contact-checkbox" value="{{ contact.id }}" onchange="updateBulkActions()">
+                    </td>
                     <td><a href="/contacts/{{ contact.id }}" style="color: var(--primary); font-weight: 500; text-decoration: none;">{{ contact.name }}</a></td>
                     <td>{{ contact.email }}</td>
                     <td>{{ contact.company or '' }}</td>
@@ -67,4 +112,123 @@
             </tbody>
         </table>
     </div>
+
+    <div id="bulkActions" class="floating-action-bar" style="display: none;">
+        <span id="selectedCount" class="count-badge">0 selected</span>
+        <div class="actions">
+            <select id="bulkStatusSelect" onchange="bulkUpdateStatus(this.value)" style="padding: 0.5rem; border-radius: 4px; border: 1px solid #ddd;">
+                <option value="">Change Status...</option>
+                <option value="lead">Lead</option>
+                <option value="contacted">Contacted</option>
+                <option value="proposal">Proposal</option>
+                <option value="negotiation">Negotiation</option>
+                <option value="closed_won">Closed Won</option>
+                <option value="closed_lost">Closed Lost</option>
+            </select>
+            <button onclick="bulkDelete()" class="btn btn-outline" style="color: #dc3545; border-color: #dc3545;">Delete Selected</button>
+            <button onclick="bulkExport()" class="btn btn-outline">Export CSV</button>
+        </div>
+    </div>
+
+    <script>
+        function toggleAll(source) {
+            checkboxes = document.getElementsByClassName('contact-checkbox');
+            for(var i=0, n=checkboxes.length;i<n;i++) {
+                checkboxes[i].checked = source.checked;
+            }
+            updateBulkActions();
+        }
+
+        function updateBulkActions() {
+            const checkboxes = document.getElementsByClassName('contact-checkbox');
+            let selectedCount = 0;
+            for(let box of checkboxes) {
+                if(box.checked) selectedCount++;
+            }
+
+            const actionBar = document.getElementById('bulkActions');
+            const countBadge = document.getElementById('selectedCount');
+            
+            if(selectedCount > 0) {
+                actionBar.style.display = 'flex';
+                countBadge.textContent = selectedCount + ' selected';
+            } else {
+                actionBar.style.display = 'none';
+            }
+        }
+
+        function getSelectedIds() {
+            const checkboxes = document.getElementsByClassName('contact-checkbox');
+            const ids = [];
+            for(let box of checkboxes) {
+                if(box.checked) ids.push(parseInt(box.value));
+            }
+            return ids;
+        }
+
+        async function bulkUpdateStatus(status) {
+            if(!status) return;
+            
+            const ids = getSelectedIds();
+            if(ids.length === 0) return;
+
+            try {
+                const response = await fetch('/contacts/bulk-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ids: ids,
+                        status: status
+                    })
+                });
+
+                if(response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to update status');
+                }
+            } catch(e) {
+                console.error(e);
+                alert('An error occurred');
+            }
+        }
+
+        async function bulkDelete() {
+            const ids = getSelectedIds();
+            if(ids.length === 0) return;
+
+            if(!confirm(`Are you sure you want to delete ${ids.length} contacts?`)) return;
+
+            try {
+                const response = await fetch('/contacts/bulk-delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ids: ids
+                    })
+                });
+
+                if(response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to delete contacts');
+                }
+            } catch(e) {
+                console.error(e);
+                alert('An error occurred');
+            }
+        }
+
+        function bulkExport() {
+            const ids = getSelectedIds();
+            if(ids.length === 0) return;
+            
+            window.location.href = `/contacts/export?ids=${ids.join(',')}`;
+        }
+    </script>
+
 {% endblock %}

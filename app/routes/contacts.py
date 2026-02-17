@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query, Body
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
@@ -9,6 +9,10 @@ import app.routes as routes_module
 import os
 import resend
 from datetime import datetime
+from typing import List
+from pydantic import BaseModel
+import csv
+import io
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -228,3 +232,93 @@ async def send_email_contact(
         print(f"[EMAIL-DEV] To: {contact.email}, Subject: {subject}, Body: {body}")
 
     return RedirectResponse(url=f"/contacts/{id}?message=Email+sent+successfully", status_code=303)
+
+
+class BulkStatusRequest(BaseModel):
+    ids: List[int]
+    status: str
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+
+@router.post("/contacts/bulk-status")
+async def bulk_status(
+    request: Request,
+    payload: BulkStatusRequest,
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    valid_statuses = ["lead", "contacted", "proposal", "negotiation", "closed_won", "closed_lost"]
+    if payload.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    contacts = db.query(Contact).filter(Contact.id.in_(payload.ids)).all()
+    count = 0
+    for contact in contacts:
+        contact.status = payload.status
+        count += 1
+    
+    db.commit()
+    return {"message": f"Updated {count} contacts"}
+
+@router.post("/contacts/bulk-delete")
+async def bulk_delete(
+    request: Request,
+    payload: BulkDeleteRequest,
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    contacts = db.query(Contact).filter(Contact.id.in_(payload.ids)).all()
+    count = 0
+    for contact in contacts:
+        db.delete(contact)
+        count += 1
+    
+    db.commit()
+    return {"message": f"Deleted {count} contacts"}
+
+@router.get("/contacts/export")
+async def export_contacts(
+    request: Request,
+    ids: str = Query(...),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    try:
+        id_list = [int(id) for id in ids.split(',')]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid IDs provided")
+    
+    contacts = db.query(Contact).filter(Contact.id.in_(id_list)).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow(["ID", "Name", "Email", "Phone", "Company", "Title", "Status", "Source", "Notes", "Assigned To", "Created At"])
+    
+    # Write data
+    for contact in contacts:
+        writer.writerow([
+            contact.id,
+            contact.name,
+            contact.email,
+            contact.phone,
+            contact.company,
+            contact.title,
+            contact.status,
+            contact.source,
+            contact.notes,
+            contact.assigned_to,
+            contact.created_at
+        ])
+    
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=contacts_export_{datetime.now().strftime('%Y%m%d%H%M%S')}.csv"}
+    )
