@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Contact, Deal, Activity
 import app.routes as routes_module
@@ -13,12 +13,49 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/contacts", response_class=HTMLResponse)
 async def list_contacts(
     request: Request,
+    q: str = Query(None),
+    status: str = Query(None),
+    sort: str = Query("created_at"),
+    order: str = Query("desc"),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
 ):
-    contacts = db.query(Contact).all()
-    return templates.TemplateResponse("contacts/list.html", {"request": request, "contacts": contacts, "user": user})
+    query = db.query(Contact)
+
+    if q:
+        search = f"%{q}%"
+        query = query.filter(
+            or_(
+                Contact.name.ilike(search),
+                Contact.email.ilike(search),
+                Contact.company.ilike(search)
+            )
+        )
+    
+    if status:
+        query = query.filter(Contact.status == status)
+        
+    # Validation for sort column to prevent injection or errors
+    valid_sort_columns = ["name", "company", "status", "created_at"]
+    if sort not in valid_sort_columns:
+        sort = "created_at"
+
+    if order == "asc":
+        query = query.order_by(getattr(Contact, sort))
+    else:
+        query = query.order_by(desc(getattr(Contact, sort)))
+
+    contacts = query.all()
+    return templates.TemplateResponse("contacts/list.html", {
+        "request": request, 
+        "contacts": contacts, 
+        "user": user,
+        "q": q,
+        "status": status,
+        "sort": sort,
+        "order": order
+    })
 
 @router.get("/contacts/new", response_class=HTMLResponse)
 async def new_contact(

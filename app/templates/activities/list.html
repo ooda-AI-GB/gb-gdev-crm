@@ -7,6 +7,32 @@
 </div>
 
 <div class="card">
+    <form method="GET" action="/activities" style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center; flex-wrap: wrap;">
+        <select name="type" onchange="this.form.submit()">
+            <option value="">All Types</option>
+            <option value="call" {% if type == 'call' %}selected{% endif %}>Call</option>
+            <option value="email" {% if type == 'email' %}selected{% endif %}>Email</option>
+            <option value="meeting" {% if type == 'meeting' %}selected{% endif %}>Meeting</option>
+            <option value="note" {% if type == 'note' %}selected{% endif %}>Note</option>
+            <option value="task" {% if type == 'task' %}selected{% endif %}>Task</option>
+        </select>
+        
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label>From:</label>
+            <input type="date" name="start_date" value="{{ start_date or '' }}">
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <label>To:</label>
+            <input type="date" name="end_date" value="{{ end_date or '' }}">
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Filter</button>
+        {% if type or start_date or end_date %}
+        <a href="/activities" class="btn btn-outline" style="text-decoration: none; padding: 0.5rem 1rem;">Clear</a>
+        {% endif %}
+    </form>
+
     <div class="timeline">
         {% for activity in activities %}
         <div class="timeline-item">

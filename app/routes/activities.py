@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -14,11 +14,39 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/activities", response_class=HTMLResponse)
 async def list_activities(
     request: Request,
+    type: str = Query(None),
+    start_date: str = Query(None),
+    end_date: str = Query(None),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
 ):
-    activities = db.query(Activity).order_by(desc(Activity.created_at)).all()
+    query = db.query(Activity)
+
+    if type:
+        query = query.filter(Activity.type == type)
+    
+    if start_date:
+        try:
+            # Append time to make it a full datetime if just date provided, or handle accordingly
+            # Assuming input type="date" sends YYYY-MM-DD
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.filter(Activity.date >= start)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+            # Set to end of day? Or just compare date part? 
+            # If using simple >= and <=, and DB has time, we might miss things on the end date if we don't adjust time.
+            # Let's add 23:59:59 to end date for inclusivity
+            end = end.replace(hour=23, minute=59, second=59)
+            query = query.filter(Activity.date <= end)
+        except ValueError:
+            pass
+
+    activities = query.order_by(desc(Activity.created_at)).all()
     contacts = db.query(Contact).all()
     deals = db.query(Deal).all()
     return templates.TemplateResponse("activities/list.html", {
@@ -26,7 +54,10 @@ async def list_activities(
         "activities": activities,
         "contacts": contacts,
         "deals": deals,
-        "user": user
+        "user": user,
+        "type": type,
+        "start_date": start_date,
+        "end_date": end_date
     })
 
 @router.post("/activities")

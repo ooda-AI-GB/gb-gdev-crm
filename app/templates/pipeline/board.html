@@ -6,6 +6,14 @@
     <button onclick="document.getElementById('dealModal').showModal()" class="btn btn-primary">+ New Deal</button>
 </div>
 
+<form method="GET" action="/pipeline" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+    <input type="text" name="q" value="{{ q or '' }}" placeholder="Search deals or contacts..." style="max-width: 300px;">
+    <button type="submit" class="btn btn-primary">Search</button>
+    {% if q %}
+    <a href="/pipeline" class="btn btn-outline" style="text-decoration: none; padding: 0.5rem 1rem;">Clear</a>
+    {% endif %}
+</form>
+
 <div class="pipeline-board">
     {% for stage in stages %}
     <div class="pipeline-column" ondrop="drop(event, '{{ stage }}')" ondragover="allowDrop(event)">

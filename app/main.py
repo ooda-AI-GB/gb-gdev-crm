@@ -16,6 +16,10 @@ app = FastAPI(title="CRM Pro")
 def health_check():
     return {"status": "ok"}
 
+@app.get("/api/health")
+def api_health_check():
+    return {"status": "ok"}
+
 # Initialize Auth
 User, require_auth = init_auth(app, engine, Base, get_db, app_name="CRM Pro")
 

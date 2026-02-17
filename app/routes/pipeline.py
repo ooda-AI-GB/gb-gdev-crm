@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Deal, Contact
 import app.routes as routes_module
@@ -14,11 +14,23 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/pipeline", response_class=HTMLResponse)
 async def pipeline_board(
     request: Request,
+    q: str = Query(None),
     user=Depends(routes_module.get_current_user),
     subscription=Depends(routes_module.get_active_subscription),
     db: Session = Depends(get_db)
 ):
-    deals = db.query(Deal).all()
+    query = db.query(Deal).join(Contact)
+    
+    if q:
+        search = f"%{q}%"
+        query = query.filter(
+            or_(
+                Deal.title.ilike(search),
+                Contact.name.ilike(search)
+            )
+        )
+    
+    deals = query.all()
     # Group deals by stage
     stages = ["qualified", "proposal", "negotiation", "closed_won", "closed_lost"]
     deals_by_stage = {stage: [] for stage in stages}
@@ -33,7 +45,8 @@ async def pipeline_board(
         "request": request,
         "deals_by_stage": deals_by_stage,
         "user": user,
-        "stages": stages
+        "stages": stages,
+        "q": q
     })
 
 @router.post("/pipeline/deals")

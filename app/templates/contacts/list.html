@@ -6,69 +6,65 @@
     <a href="/contacts/new" class="btn btn-primary">+ New Contact</a>
 </div>
 
-<div class="card">
-    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-        <input type="text" placeholder="Search contacts..." id="searchInput">
-        <select id="statusFilter">
-            <option value="">All Statuses</option>
-            <option value="lead">Lead</option>
-            <option value="contacted">Contacted</option>
-            <option value="proposal">Proposal</option>
-            <option value="negotiation">Negotiation</option>
-            <option value="closed_won">Closed Won</option>
-            <option value="closed_lost">Closed Lost</option>
-        </select>
+    <div class="card">
+        <form method="GET" action="/contacts" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+            <input type="text" name="q" value="{{ q or '' }}" placeholder="Search contacts..." id="searchInput">
+            <select name="status" id="statusFilter" onchange="this.form.submit()">
+                <option value="">All Statuses</option>
+                <option value="lead" {% if status == 'lead' %}selected{% endif %}>Lead</option>
+                <option value="contacted" {% if status == 'contacted' %}selected{% endif %}>Contacted</option>
+                <option value="proposal" {% if status == 'proposal' %}selected{% endif %}>Proposal</option>
+                <option value="negotiation" {% if status == 'negotiation' %}selected{% endif %}>Negotiation</option>
+                <option value="closed_won" {% if status == 'closed_won' %}selected{% endif %}>Closed Won</option>
+                <option value="closed_lost" {% if status == 'closed_lost' %}selected{% endif %}>Closed Lost</option>
+            </select>
+            <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Search</button>
+            {% if q or status %}
+                <a href="/contacts" class="btn btn-outline" style="text-decoration: none; padding: 0.5rem 1rem;">Clear</a>
+            {% endif %}
+        </form>
+    
+        <table>
+            <thead>
+                <tr>
+                    <th>
+                        <a href="/contacts?sort=name&order={% if sort == 'name' and order == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}{% if status %}&status={{ status }}{% endif %}" style="color: inherit; text-decoration: none;">
+                            Name {% if sort == 'name' %}{% if order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>Email</th>
+                    <th>
+                        <a href="/contacts?sort=company&order={% if sort == 'company' and order == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}{% if status %}&status={{ status }}{% endif %}" style="color: inherit; text-decoration: none;">
+                            Company {% if sort == 'company' %}{% if order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/contacts?sort=status&order={% if sort == 'status' and order == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}{% if status %}&status={{ status }}{% endif %}" style="color: inherit; text-decoration: none;">
+                            Status {% if sort == 'status' %}{% if order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="/contacts?sort=created_at&order={% if sort == 'created_at' and order == 'asc' %}desc{% else %}asc{% endif %}{% if q %}&q={{ q }}{% endif %}{% if status %}&status={{ status }}{% endif %}" style="color: inherit; text-decoration: none;">
+                            Created {% if sort == 'created_at' %}{% if order == 'asc' %}▲{% else %}▼{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for contact in contacts %}
+                <tr>
+                    <td><a href="/contacts/{{ contact.id }}" style="color: var(--primary); font-weight: 500; text-decoration: none;">{{ contact.name }}</a></td>
+                    <td>{{ contact.email }}</td>
+                    <td>{{ contact.company or '' }}</td>
+                    <td><span class="badge badge-{{ contact.status }}">{{ contact.status.replace('_', ' ') }}</span></td>
+                    <td>{{ contact.created_at.strftime('%Y-%m-%d') }}</td>
+                    <td style="text-align: right;">
+                        <a href="/contacts/{{ contact.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Company</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for contact in contacts %}
-            <tr>
-                <td><a href="/contacts/{{ contact.id }}" style="color: var(--primary); font-weight: 500; text-decoration: none;">{{ contact.name }}</a></td>
-                <td>{{ contact.email }}</td>
-                <td>{{ contact.company or '' }}</td>
-                <td><span class="badge badge-{{ contact.status }}">{{ contact.status.replace('_', ' ') }}</span></td>
-                <td>{{ contact.created_at.strftime('%Y-%m-%d') }}</td>
-                <td style="text-align: right;">
-                    <a href="/contacts/{{ contact.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-
-<script>
-    const searchInput = document.getElementById('searchInput');
-    const statusFilter = document.getElementById('statusFilter');
-    const tableRows = document.querySelectorAll('tbody tr');
-
-    function filterContacts() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const status = statusFilter.value.toLowerCase();
-
-        tableRows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            const rowStatus = row.querySelector('.badge').className.toLowerCase(); // Check class name for status
-            
-            const matchesSearch = text.includes(searchTerm);
-            const matchesStatus = status === '' || rowStatus.includes(status);
-
-            row.style.display = matchesSearch && matchesStatus ? '' : 'none';
-        });
-    }
-
-    searchInput.addEventListener('input', filterContacts);
-    statusFilter.addEventListener('change', filterContacts);
-</script>
 {% endblock %}
