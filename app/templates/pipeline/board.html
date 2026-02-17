@@ -14,16 +14,49 @@
     {% endif %}
 </form>
 
-<div class="pipeline-board">
+    <style>
+        .deal-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+            cursor: grab;
+        }
+        .deal-card:active {
+            cursor: grabbing;
+        }
+        .deal-card.dragging {
+            opacity: 0.6;
+            transform: scale(1.02) rotate(1deg);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+        .pipeline-column {
+            transition: border-color 0.2s ease, background-color 0.2s ease;
+            border: 2px solid transparent;
+            height: 100%;
+        }
+        .pipeline-column.drag-over {
+            border-color: var(--primary);
+            background-color: rgba(79, 142, 247, 0.05);
+        }
+        .column-stats {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+    </style>
+    <div class="pipeline-board">
     {% for stage in stages %}
-    <div class="pipeline-column" ondrop="drop(event, '{{ stage }}')" ondragover="allowDrop(event)">
+    <div class="pipeline-column" id="col-{{ stage }}" data-stage="{{ stage }}" ondrop="drop(event)" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
         <div class="column-header">
             <span>{{ stage.replace('_', ' ')|capitalize }}</span>
-            <span class="count-badge">{{ deals_by_stage[stage]|length }}</span>
+            <div class="column-stats">
+                <span class="count-badge" id="count-{{ stage }}">{{ deals_by_stage[stage]|length }}</span>
+                {% set stage_val = deals_by_stage[stage]|map(attribute='value')|sum %}
+                <span class="count-badge" id="val-{{ stage }}" data-value="{{ stage_val }}" style="background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border);">${{ "{:,.0f}".format(stage_val) }}</span>
+            </div>
         </div>
         
         {% for deal in deals_by_stage[stage] %}
-        <div class="deal-card" draggable="true" ondragstart="drag(event, '{{ deal.id }}')">
+        <div class="deal-card" id="deal-{{ deal.id }}" data-value="{{ deal.value }}" draggable="true" ondragstart="drag(event, '{{ deal.id }}')" ondragend="dragEnd(event)">
             <div style="font-weight: 600;">{{ deal.title }}</div>
             <div style="font-size: 0.85rem; color: var(--text-secondary);">{{ deal.contact.name }}</div>
             <div class="deal-value">${{ "{:,.0f}".format(deal.value) }}</div>
@@ -88,19 +121,82 @@
 </dialog>
 
 <script>
+    let draggedItem = null;
+
     function allowDrop(ev) {
         ev.preventDefault();
+        ev.dataTransfer.dropEffect = "move";
+    }
+
+    function dragEnter(ev) {
+        ev.preventDefault();
+        const column = ev.target.closest('.pipeline-column');
+        if (column) {
+            column.classList.add('drag-over');
+        }
+    }
+
+    function dragLeave(ev) {
+        // Only remove if leaving the column entirely, not entering a child
+        const column = ev.target.closest('.pipeline-column');
+        if (column && !column.contains(ev.relatedTarget)) {
+            column.classList.remove('drag-over');
+        }
     }
 
     function drag(ev, id) {
+        // Ensure we get the card element, not a child
+        let card = ev.target.closest('.deal-card');
+        if (!card) return;
+        
+        draggedItem = card;
         ev.dataTransfer.setData("text", id);
+        ev.dataTransfer.effectAllowed = "move";
+        // Delay adding class so the drag image is taken from original state
+        setTimeout(() => card.classList.add('dragging'), 0);
     }
 
-    function drop(ev, stage) {
+    function dragEnd(ev) {
+        if (draggedItem) {
+            draggedItem.classList.remove('dragging');
+            draggedItem = null;
+        }
+        // Ensure all columns lose drag-over state
+        document.querySelectorAll('.pipeline-column').forEach(col => col.classList.remove('drag-over'));
+    }
+
+    function drop(ev) {
         ev.preventDefault();
+        
+        // Find drop target column
+        const column = ev.target.closest('.pipeline-column');
+        if (!column) return;
+        
+        // Remove highlight
+        column.classList.remove('drag-over');
+        
+        const stage = column.getAttribute('data-stage');
         var id = ev.dataTransfer.getData("text");
         
-        // Optimistic UI update could be done here, but let's just reload or move element
+        // Find the card element.
+        let card = draggedItem;
+        if (!card) {
+            card = document.getElementById('deal-' + id);
+        }
+        if (!card) return;
+
+        const oldColumn = card.closest('.pipeline-column');
+        const oldStage = oldColumn.getAttribute('data-stage');
+
+        // If dropped in same column, do nothing
+        if (oldStage === stage) return;
+
+        // Optimistic UI Update: Move card
+        column.appendChild(card);
+        
+        // Update Stats
+        updateStats(oldStage, stage, parseFloat(card.getAttribute('data-value')));
+
         // Send POST request
         const formData = new FormData();
         formData.append('stage', stage);
@@ -109,12 +205,45 @@
             method: 'POST',
             body: formData
         }).then(response => {
-            if (response.ok) {
-                window.location.reload(); // Simple reload to refresh state
-            } else {
+            if (!response.ok) {
+                // Revert on failure
                 alert('Failed to move deal');
+                oldColumn.appendChild(card);
+                updateStats(stage, oldStage, parseFloat(card.getAttribute('data-value'))); // Revert stats
             }
         });
+    }
+
+    function updateStats(fromStage, toStage, value) {
+        // Update counts
+        const fromCountEl = document.getElementById(`count-${fromStage}`);
+        const toCountEl = document.getElementById(`count-${toStage}`);
+        
+        if (fromCountEl) fromCountEl.innerText = parseInt(fromCountEl.innerText) - 1;
+        if (toCountEl) toCountEl.innerText = parseInt(toCountEl.innerText) + 1;
+        
+        // Update values
+        const fromValEl = document.getElementById(`val-${fromStage}`);
+        const toValEl = document.getElementById(`val-${toStage}`);
+        
+        // Helper to format number to currency: 1200 -> "$1,200"
+        const formatCurrency = (num) => {
+            return '$' + num.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+        };
+
+        if (fromValEl) {
+            let currentVal = parseFloat(fromValEl.getAttribute('data-value')) || 0;
+            let newVal = currentVal - value;
+            fromValEl.setAttribute('data-value', newVal);
+            fromValEl.innerText = formatCurrency(newVal);
+        }
+        
+        if (toValEl) {
+            let currentVal = parseFloat(toValEl.getAttribute('data-value')) || 0;
+            let newVal = currentVal + value;
+            toValEl.setAttribute('data-value', newVal);
+            toValEl.innerText = formatCurrency(newVal);
+        }
     }
 </script>
 {% endblock %}
