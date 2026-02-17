@@ -1,6 +1,29 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<style>
+    .charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+    .chart-container {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+    @media (max-width: 900px) {
+        .charts-grid {
+            grid-template-columns: 1fr;
+        }
+        /* Make the existing grid responsive too if it isn't already */
+        .existing-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+
 <div class="top-bar">
     <h1>Dashboard</h1>
 </div>
@@ -24,7 +47,29 @@
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+<!-- Charts -->
+<div class="charts-grid">
+    <div class="card">
+        <h3>Pipeline Value by Stage</h3>
+        <div class="chart-container">
+            <canvas id="pipelineValueChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <h3>Deal Count by Stage</h3>
+        <div class="chart-container">
+            <canvas id="dealCountChart"></canvas>
+        </div>
+    </div>
+    <div class="card" style="grid-column: 1 / -1;">
+        <h3>Activity Trends (Last 30 Days)</h3>
+        <div class="chart-container">
+            <canvas id="activityTrendChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="existing-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
     <!-- Pipeline Summary -->
     <div class="card">
         <h2>Pipeline Summary</h2>
@@ -89,4 +134,97 @@
         {% endfor %}
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const chartData = {{ chart_data | tojson }};
+        
+        // Pipeline Value Chart (Horizontal Bar)
+        const ctxValue = document.getElementById('pipelineValueChart').getContext('2d');
+        new Chart(ctxValue, {
+            type: 'bar',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    label: 'Total Value ($)',
+                    data: chartData.deal_values,
+                    backgroundColor: [
+                        '#dbeafe', // qualified
+                        '#ffedd5', // proposal
+                        '#f3e8ff', // negotiation
+                        '#dcfce7', // closed won
+                        '#fee2e2'  // closed lost
+                    ],
+                    borderColor: [
+                        '#1e40af',
+                        '#c2410c',
+                        '#7e22ce',
+                        '#15803d',
+                        '#b91c1c'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Deal Count Chart (Doughnut)
+        const ctxCount = document.getElementById('dealCountChart').getContext('2d');
+        new Chart(ctxCount, {
+            type: 'doughnut',
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.deal_counts,
+                    backgroundColor: [
+                        '#dbeafe', '#ffedd5', '#f3e8ff', '#dcfce7', '#fee2e2'
+                    ],
+                    borderColor: [
+                        '#1e40af', '#c2410c', '#7e22ce', '#15803d', '#b91c1c'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+
+        // Activity Trends Chart (Line)
+        const ctxActivity = document.getElementById('activityTrendChart').getContext('2d');
+        new Chart(ctxActivity, {
+            type: 'line',
+            data: {
+                labels: chartData.activity_labels,
+                datasets: chartData.activity_datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
 {% endblock %}
