@@ -1,0 +1,187 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>Automation Rules</h1>
+    <button onclick="document.getElementById('new-rule-modal').style.display='block'" class="btn btn-primary">
+        + New Rule
+    </button>
+</div>
+
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Name</th>
+                <th>Trigger</th>
+                <th>Condition</th>
+                <th>Action</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rule in rules %}
+            <tr>
+                <td>
+                    <form action="/settings/automations/{{ rule.id }}/toggle" method="post" style="display:inline;">
+                        <button type="submit" class="btn btn-sm {% if rule.enabled %}btn-primary{% else %}btn-outline{% endif %}">
+                            {% if rule.enabled %}ON{% else %}OFF{% endif %}
+                        </button>
+                    </form>
+                </td>
+                <td><strong>{{ rule.name }}</strong></td>
+                <td>{{ rule.trigger_type }}</td>
+                <td>
+                    <pre style="margin:0; font-size:0.8rem; background:#f8fafc; padding:0.25rem;">{{ rule.condition }}</pre>
+                </td>
+                <td>
+                    <div>{{ rule.action_type }}</div>
+                    <pre style="margin:0; font-size:0.8rem; background:#f8fafc; padding:0.25rem;">{{ rule.action_config }}</pre>
+                </td>
+                <td>
+                    <form action="/settings/automations/{{ rule.id }}/delete" method="post" onsubmit="return confirm('Are you sure?');">
+                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- New Rule Modal -->
+<div id="new-rule-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:2000;">
+    <div style="background:white; margin:5% auto; padding:2rem; width:600px; border-radius:8px; position:relative;">
+        <button onclick="document.getElementById('new-rule-modal').style.display='none'" style="position:absolute; top:1rem; right:1rem; background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+        <h2>Create New Automation Rule</h2>
+        
+        <form action="/settings/automations/new" method="post">
+            <div class="form-group">
+                <label>Rule Name</label>
+                <input type="text" name="name" required placeholder="e.g. Notify on big deal">
+            </div>
+
+            <div class="form-group">
+                <label>Trigger</label>
+                <select name="trigger_type" id="trigger_type" onchange="updateConditionFields()" required>
+                    <option value="">Select Trigger...</option>
+                    <option value="deal_stage_change">Deal Stage Change</option>
+                    <option value="contact_status_change">Contact Status Change</option>
+                    <option value="deal_probability_threshold">Deal Probability Threshold</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="background:#f8fafc; padding:1rem; border-radius:6px;">
+                <label>Condition</label>
+                <!-- Dynamic fields based on trigger -->
+                <div id="condition-stage" style="display:none;">
+                    <label>Stage equals:</label>
+                    <input type="hidden" name="condition_key" value="stage" disabled>
+                    <select name="condition_value" disabled>
+                        <option value="qualified">Qualified</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="closed_won">Closed Won</option>
+                        <option value="closed_lost">Closed Lost</option>
+                    </select>
+                </div>
+                <div id="condition-status" style="display:none;">
+                    <label>Status equals:</label>
+                    <input type="hidden" name="condition_key" value="status" disabled>
+                    <select name="condition_value" disabled>
+                        <option value="lead">Lead</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="proposal">Proposal</option>
+                        <option value="negotiation">Negotiation</option>
+                        <option value="closed_won">Closed Won</option>
+                        <option value="closed_lost">Closed Lost</option>
+                    </select>
+                </div>
+                <div id="condition-prob" style="display:none;">
+                    <label>Probability >= (%)</label>
+                    <input type="hidden" name="condition_key" value="probability_gte" disabled>
+                    <input type="number" name="condition_value" min="0" max="100" disabled>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Action</label>
+                <select name="action_type" id="action_type" onchange="updateActionFields()" required>
+                    <option value="">Select Action...</option>
+                    <option value="create_notification">Create Notification</option>
+                    <option value="create_activity">Create Activity</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="background:#f8fafc; padding:1rem; border-radius:6px;">
+                <label>Action Configuration</label>
+                <div id="action-notification" style="display:none;">
+                    <label>Message Template</label>
+                    <input type="hidden" name="action_config_key" value="message" disabled>
+                    <input type="text" name="action_config_value" placeholder="e.g. Deal won!" disabled>
+                </div>
+                <div id="action-activity" style="display:none;">
+                    <!-- Simplification: Just passing a subject as value for now, properly handling complex JSON in form would require more JS or hidden inputs -->
+                    <label>Activity Subject</label>
+                    <input type="hidden" name="action_config_key" value="subject" disabled>
+                    <input type="text" name="action_config_value" placeholder="e.g. Follow up task" disabled>
+                    <small style="display:block; color:var(--text-secondary); margin-top:0.5rem;">Note: Will create a task due in 3 days.</small>
+                </div>
+            </div>
+
+            <div style="text-align:right; margin-top:2rem;">
+                <button type="button" onclick="document.getElementById('new-rule-modal').style.display='none'" class="btn btn-outline">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Rule</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function updateConditionFields() {
+    const trigger = document.getElementById('trigger_type').value;
+    
+    // Hide all
+    document.getElementById('condition-stage').style.display = 'none';
+    document.getElementById('condition-status').style.display = 'none';
+    document.getElementById('condition-prob').style.display = 'none';
+    
+    // Disable all inputs inside
+    document.querySelectorAll('[name^="condition_"]').forEach(el => el.disabled = true);
+
+    if (trigger === 'deal_stage_change') {
+        const div = document.getElementById('condition-stage');
+        div.style.display = 'block';
+        div.querySelectorAll('input, select').forEach(el => el.disabled = false);
+    } else if (trigger === 'contact_status_change') {
+        const div = document.getElementById('condition-status');
+        div.style.display = 'block';
+        div.querySelectorAll('input, select').forEach(el => el.disabled = false);
+    } else if (trigger === 'deal_probability_threshold') {
+        const div = document.getElementById('condition-prob');
+        div.style.display = 'block';
+        div.querySelectorAll('input').forEach(el => el.disabled = false);
+    }
+}
+
+function updateActionFields() {
+    const action = document.getElementById('action_type').value;
+    
+    document.getElementById('action-notification').style.display = 'none';
+    document.getElementById('action-activity').style.display = 'none';
+    
+    document.querySelectorAll('[name^="action_config_"]').forEach(el => el.disabled = true);
+
+    if (action === 'create_notification') {
+        const div = document.getElementById('action-notification');
+        div.style.display = 'block';
+        div.querySelectorAll('input').forEach(el => el.disabled = false);
+    } else if (action === 'create_activity') {
+        const div = document.getElementById('action-activity');
+        div.style.display = 'block';
+        div.querySelectorAll('input').forEach(el => el.disabled = false);
+    }
+}
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, Date, Table
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, Date, Table, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -107,4 +107,16 @@ class Notification(Base):
     type = Column(String, nullable=False) # task_due, deal_milestone, system
     read = Column(Boolean, default=False)
     link = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class AutomationRule(Base):
+    __tablename__ = "automation_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(200), nullable=False)
+    trigger_type = Column(String, nullable=False) # deal_stage_change, contact_status_change, activity_created, deal_probability_threshold
+    condition = Column(JSON, nullable=False) # {stage: closed_won} or {probability_gte: 80}
+    action_type = Column(String, nullable=False) # create_notification, create_activity, update_status
+    action_config = Column(JSON, nullable=False) # action parameters
+    enabled = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.database import get_db
 from app.models import Activity, Contact, Deal
+from app.automation_engine import evaluate_rules
 import app.routes as routes_module
 from datetime import datetime
 
@@ -89,6 +90,8 @@ async def create_activity(
     )
     db.add(activity)
     db.commit()
+    db.refresh(activity)
+    evaluate_rules(db, "activity_created", activity, user)
     return RedirectResponse(url="/activities", status_code=303)
 
 @router.post("/activities/{id}/complete")

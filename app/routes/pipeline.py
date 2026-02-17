@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Deal, Contact, Notification
+from app.automation_engine import evaluate_rules
 import app.routes as routes_module
 from datetime import date, datetime
 import csv
@@ -84,6 +85,9 @@ async def create_deal(
     )
     db.add(deal)
     db.commit()
+    db.refresh(deal)
+    evaluate_rules(db, "deal_stage_change", deal, user)
+    evaluate_rules(db, "deal_probability_threshold", deal, user)
     return RedirectResponse(url="/pipeline", status_code=303)
 
 @router.post("/pipeline/deals/{id}/move")
@@ -100,6 +104,8 @@ async def move_deal(
         raise HTTPException(status_code=404, detail="Deal not found")
     
     deal.stage = stage
+
+    evaluate_rules(db, "deal_stage_change", deal, user)
 
     if stage == "closed_won":
         contact = db.query(Contact).filter(Contact.id == deal.contact_id).first()
@@ -129,6 +135,26 @@ async def move_deal(
     # Given typical "board" interactions, I'll return JSON if it looks like an API call, or redirect if form submit.
     # Actually, let's just return a simple JSON response as it's likely consumed by JS.
     return JSONResponse({"status": "success", "new_stage": stage})
+
+@router.post("/pipeline/deals/{id}/update")
+async def update_deal(
+    request: Request,
+    id: int,
+    probability: int = Form(None),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    deal = db.query(Deal).filter(Deal.id == id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    
+    if probability is not None:
+        deal.probability = probability
+        evaluate_rules(db, "deal_probability_threshold", deal, user)
+        
+    db.commit()
+    return RedirectResponse(url="/pipeline", status_code=303)
 
 @router.get("/pipeline/export")
 async def export_deals(

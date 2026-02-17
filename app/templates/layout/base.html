@@ -458,6 +458,9 @@
             <a href="/pricing" class="nav-link {% if request.url.path.startswith('/pricing') %}active{% endif %}">
                 💎 Billing
             </a>
+            <a href="/settings/automations" class="nav-link {% if request.url.path.startswith('/settings') %}active{% endif %}">
+                ⚙️ Settings
+            </a>
         </div>
         {% if user %}
         <div class="user-section">

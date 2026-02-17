@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from app.models import Contact, Deal, Activity, CompanyIntel, Tag
+from app.models import Contact, Deal, Activity, CompanyIntel, Tag, AutomationRule
 from datetime import datetime, date
 
 def seed_crm_data(db: Session):
@@ -123,4 +123,39 @@ def seed_crm_data(db: Session):
         intel = CompanyIntel(**data)
         db.add(intel)
         
+    db.commit()
+
+    # Automation Rules
+    rules_data = [
+        {
+            "name": "Notify on high probability",
+            "trigger_type": "deal_probability_threshold",
+            "condition": {"probability_gte": 80},
+            "action_type": "create_notification",
+            "action_config": {"message": "Deal probability reached 80% or more!"},
+            "enabled": True
+        },
+        {
+            "name": "Auto-task on new lead",
+            "trigger_type": "contact_status_change",
+            "condition": {"status": "lead"},
+            "action_type": "create_activity",
+            "action_config": {"type": "task", "subject": "Follow up with new lead", "description": "Auto-generated follow-up task", "due_in_days": 3},
+            "enabled": True
+        },
+        {
+            "name": "Won deal celebration",
+            "trigger_type": "deal_stage_change",
+            "condition": {"stage": "closed_won"},
+            "action_type": "create_notification",
+            "action_config": {"message": "Congratulations! A deal has been won!"},
+            "enabled": True
+        }
+    ]
+
+    for r_data in rules_data:
+        existing = db.query(AutomationRule).filter(AutomationRule.name == r_data["name"]).first()
+        if not existing:
+            db.add(AutomationRule(**r_data))
+    
     db.commit()

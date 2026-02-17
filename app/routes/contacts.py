@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from app.database import get_db
 from app.models import Contact, Deal, Activity, Tag, ContactNote
+from app.automation_engine import evaluate_rules
 import app.routes as routes_module
 import os
 import resend
@@ -115,6 +116,7 @@ async def create_contact(
     db.add(contact)
     db.commit()
     db.refresh(contact)
+    evaluate_rules(db, "contact_status_change", contact, user)
     return RedirectResponse(url=f"/contacts/{contact.id}", status_code=303)
 
 @router.get("/contacts/{id}", response_class=HTMLResponse)
@@ -190,6 +192,7 @@ async def update_contact(
     contact.assigned_to = assigned_to
     
     db.commit()
+    evaluate_rules(db, "contact_status_change", contact, user)
     return RedirectResponse(url=f"/contacts/{id}", status_code=303)
 
 @router.post("/contacts/{id}/delete")
@@ -275,6 +278,7 @@ async def bulk_status(
     for contact in contacts:
         contact.status = payload.status
         count += 1
+        evaluate_rules(db, "contact_status_change", contact, user)
     
     db.commit()
     return {"message": f"Updated {count} contacts"}
