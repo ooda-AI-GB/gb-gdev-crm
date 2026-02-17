@@ -1,8 +1,24 @@
 from sqlalchemy.orm import Session
-from app.models import Contact, Deal, Activity, CompanyIntel
+from app.models import Contact, Deal, Activity, CompanyIntel, Tag
 from datetime import datetime, date
 
 def seed_crm_data(db: Session):
+    # Seed Tags
+    tags_data = [
+        {"name": "VIP", "color": "gold"},
+        {"name": "Follow-up", "color": "blue"},
+        {"name": "At Risk", "color": "red"},
+        {"name": "New Lead", "color": "green"},
+        {"name": "Enterprise", "color": "purple"}
+    ]
+
+    for t_data in tags_data:
+        existing = db.query(Tag).filter(Tag.name == t_data["name"]).first()
+        if not existing:
+            db.add(Tag(**t_data))
+    
+    db.commit()
+
     # Check if data exists
     if db.query(Contact).count() > 0:
         return

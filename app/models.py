@@ -1,7 +1,33 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, Date
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Boolean, Date, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+
+contact_tags = Table(
+    "contact_tags",
+    Base.metadata,
+    Column("contact_id", Integer, ForeignKey("contacts.id"), primary_key=True),
+    Column("tag_id", Integer, ForeignKey("tags.id"), primary_key=True),
+)
+
+class Tag(Base):
+    __tablename__ = "tags"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(50), unique=True, nullable=False)
+    color = Column(String(20), default="blue") # e.g. "blue", "red", "green", "purple", "gold"
+
+    contacts = relationship("Contact", secondary=contact_tags, back_populates="tags")
+
+class ContactNote(Base):
+    __tablename__ = "contact_notes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    contact_id = Column(Integer, ForeignKey("contacts.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    contact = relationship("Contact", back_populates="contact_notes")
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -19,6 +45,9 @@ class Contact(Base):
     assigned_to = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    tags = relationship("Tag", secondary=contact_tags, back_populates="contacts")
+    contact_notes = relationship("ContactNote", back_populates="contact", cascade="all, delete-orphan")
 
     deals = relationship("Deal", back_populates="contact", cascade="all, delete-orphan")
     activities = relationship("Activity", back_populates="contact", cascade="all, delete-orphan")

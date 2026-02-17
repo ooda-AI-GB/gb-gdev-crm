@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from app.database import get_db
-from app.models import Contact, Deal, Activity
+from app.models import Contact, Deal, Activity, Tag, ContactNote
 import app.routes as routes_module
 import os
 import resend
@@ -24,6 +24,7 @@ async def list_contacts(
     request: Request,
     q: str = Query(None),
     status: str = Query(None),
+    tag_id: List[int] = Query(None),
     sort: str = Query("created_at"),
     order: str = Query("desc"),
     message: str = Query(None),
@@ -45,6 +46,9 @@ async def list_contacts(
     
     if status:
         query = query.filter(Contact.status == status)
+
+    if tag_id:
+        query = query.join(Contact.tags).filter(Tag.id.in_(tag_id)).distinct()
         
     # Validation for sort column to prevent injection or errors
     valid_sort_columns = ["name", "company", "status", "created_at"]
@@ -57,12 +61,16 @@ async def list_contacts(
         query = query.order_by(desc(getattr(Contact, sort)))
 
     contacts = query.all()
+    all_tags = db.query(Tag).all()
+
     return templates.TemplateResponse("contacts/list.html", {
         "request": request, 
         "contacts": contacts, 
         "user": user,
         "q": q,
         "status": status,
+        "tag_id": tag_id,
+        "all_tags": all_tags,
         "sort": sort,
         "order": order,
         "message": message
@@ -122,12 +130,17 @@ async def view_contact(
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
     
+    all_tags = db.query(Tag).all()
+    notes = db.query(ContactNote).filter(ContactNote.contact_id == id).order_by(desc(ContactNote.created_at)).all()
+
     return templates.TemplateResponse("contacts/detail.html", {
         "request": request, 
         "contact": contact, 
         "user": user,
         "deals": contact.deals,
         "activities": contact.activities,
+        "contact_notes": notes,
+        "all_tags": all_tags,
         "message": message
     })
 
@@ -464,7 +477,78 @@ async def import_contacts_confirm(
     if os.path.exists(file_path):
         os.remove(file_path)
         
-    return RedirectResponse(
-        url=f"/contacts?message=Imported+{added_count}+contacts.+Skipped+{skipped_count}+duplicates.", 
-        status_code=303
-    )
+@router.post("/contacts/{id}/tags")
+async def add_contact_tag(
+    request: Request,
+    id: int,
+    tag_id: Optional[int] = Form(None),
+    new_tag_name: Optional[str] = Form(None),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    contact = db.query(Contact).filter(Contact.id == id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    tag = None
+    if tag_id:
+        tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    elif new_tag_name:
+        # Check if tag already exists
+        new_tag_name = new_tag_name.strip()
+        tag = db.query(Tag).filter(Tag.name.ilike(new_tag_name)).first()
+        if not tag:
+            # Create new tag with a random color
+            import random
+            colors = ["blue", "red", "green", "purple", "gold", "indigo", "pink", "yellow"]
+            tag = Tag(name=new_tag_name, color=random.choice(colors))
+            db.add(tag)
+            db.commit()
+            db.refresh(tag)
+    
+    if tag:
+        if tag not in contact.tags:
+            contact.tags.append(tag)
+            db.commit()
+    
+    return RedirectResponse(url=f"/contacts/{id}", status_code=303)
+
+@router.post("/contacts/{id}/tags/{tag_id}/delete")
+async def remove_contact_tag(
+    request: Request,
+    id: int,
+    tag_id: int,
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    contact = db.query(Contact).filter(Contact.id == id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if tag and tag in contact.tags:
+        contact.tags.remove(tag)
+        db.commit()
+        
+    return RedirectResponse(url=f"/contacts/{id}", status_code=303)
+
+@router.post("/contacts/{id}/notes")
+async def add_contact_note(
+    request: Request,
+    id: int,
+    content: str = Form(...),
+    user=Depends(routes_module.get_current_user),
+    subscription=Depends(routes_module.get_active_subscription),
+    db: Session = Depends(get_db)
+):
+    contact = db.query(Contact).filter(Contact.id == id).first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    
+    note = ContactNote(contact_id=contact.id, content=content)
+    db.add(note)
+    db.commit()
+    
+    return RedirectResponse(url=f"/contacts/{id}", status_code=303)

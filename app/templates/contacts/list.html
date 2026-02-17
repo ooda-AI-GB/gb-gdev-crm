@@ -67,8 +67,13 @@
                 <option value="closed_won" {% if status == 'closed_won' %}selected{% endif %}>Closed Won</option>
                 <option value="closed_lost" {% if status == 'closed_lost' %}selected{% endif %}>Closed Lost</option>
             </select>
+            <select name="tag_id" id="tagFilter" multiple style="height: 2.5rem; padding: 0.2rem;" title="Hold Ctrl/Cmd to select multiple">
+                {% for tag in all_tags %}
+                <option value="{{ tag.id }}" {% if tag_id and tag.id in tag_id %}selected{% endif %}>{{ tag.name }}</option>
+                {% endfor %}
+            </select>
             <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem;">Search</button>
-            {% if q or status %}
+            {% if q or status or tag_id %}
                 <a href="/contacts" class="btn btn-outline" style="text-decoration: none; padding: 0.5rem 1rem;">Clear</a>
             {% endif %}
         </form>
