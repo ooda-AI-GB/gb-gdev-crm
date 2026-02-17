@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 from app.database import get_db
-from app.models import Deal, Contact
+from app.models import Deal, Contact, Notification
 import app.routes as routes_module
 from datetime import date, datetime
 import csv
@@ -100,6 +100,28 @@ async def move_deal(
         raise HTTPException(status_code=404, detail="Deal not found")
     
     deal.stage = stage
+
+    if stage == "closed_won":
+        contact = db.query(Contact).filter(Contact.id == deal.contact_id).first()
+        if contact:
+            # Check if notification already exists for this milestone
+            existing = db.query(Notification).filter(
+                Notification.user_id == str(contact.user_id),
+                Notification.type == "deal_milestone",
+                Notification.link == f"/contacts/{contact.id}",
+                Notification.message.like(f"%{deal.title}%")
+            ).first()
+            
+            if not existing:
+                notif = Notification(
+                    user_id=str(contact.user_id),
+                    title="Deal Won!",
+                    message=f"Deal '{deal.title}' has been won!",
+                    type="deal_milestone",
+                    link=f"/contacts/{contact.id}"
+                )
+                db.add(notif)
+    
     db.commit()
     # If it's an AJAX request, we might want to return JSON, but for now redirect is safer for simple implementation
     # However, for drag-and-drop usually we want JSON. 

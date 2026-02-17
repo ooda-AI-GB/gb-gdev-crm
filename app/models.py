@@ -96,3 +96,15 @@ class CompanyIntel(Base):
     model_used = Column(String, nullable=True)
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     requested_by = Column(String, nullable=True)
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String, nullable=False)
+    title = Column(String(200), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String, nullable=False) # task_due, deal_milestone, system
+    read = Column(Boolean, default=False)
+    link = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

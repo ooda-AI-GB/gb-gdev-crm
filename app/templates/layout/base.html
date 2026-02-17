@@ -470,8 +470,128 @@
         </div>
         {% endif %}
     </div>
-    <div class="main-content">
+    <div class="main-content" style="position: relative;">
+        <!-- Notification Center -->
+        <div id="notification-center" style="position: absolute; top: 2rem; right: 2rem; z-index: 1000;">
+            <div id="bell-icon" style="cursor: pointer; position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid var(--border);">
+                <span style="font-size: 1.2rem;">🔔</span>
+                <span id="unread-badge" style="position: absolute; top: 0; right: 0; background: var(--danger); color: white; border-radius: 50%; padding: 2px 5px; font-size: 0.7rem; font-weight: bold; display: none;">0</span>
+            </div>
+            
+            <div id="notification-dropdown" style="display: none; position: absolute; right: 0; top: 50px; width: 320px; background: white; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px; overflow: hidden; z-index: 1001;">
+                <div style="padding: 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                    <span style="font-weight: 600;">Notifications</span>
+                    <button id="mark-all-read" class="btn btn-sm" style="background: none; border: none; color: var(--primary); cursor: pointer; padding: 0;">Mark all read</button>
+                </div>
+                <div id="notification-list" style="max-height: 350px; overflow-y: auto;">
+                    <!-- Items go here -->
+                </div>
+            </div>
+        </div>
+
         {% block content %}{% endblock %}
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const bellIcon = document.getElementById('bell-icon');
+            const dropdown = document.getElementById('notification-dropdown');
+            const badge = document.getElementById('unread-badge');
+            const list = document.getElementById('notification-list');
+            const markAllBtn = document.getElementById('mark-all-read');
+            
+            let isOpen = false;
+
+            // Toggle dropdown
+            bellIcon.addEventListener('click', function(e) {
+                e.stopPropagation();
+                isOpen = !isOpen;
+                dropdown.style.display = isOpen ? 'block' : 'none';
+            });
+
+            // Close when clicking outside
+            document.addEventListener('click', function(e) {
+                if (isOpen && !dropdown.contains(e.target) && !bellIcon.contains(e.target)) {
+                    isOpen = false;
+                    dropdown.style.display = 'none';
+                }
+            });
+
+            // Fetch notifications
+            async function fetchNotifications() {
+                try {
+                    const res = await fetch('/api/notifications');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    
+                    // Update badge
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count;
+                        badge.style.display = 'block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                    
+                    // Render list
+                    list.innerHTML = '';
+                    if (data.notifications.length === 0) {
+                        list.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">No notifications</div>';
+                    } else {
+                        data.notifications.forEach(n => {
+                            const item = document.createElement('div');
+                            item.style.padding = '1rem';
+                            item.style.borderBottom = '1px solid var(--border)';
+                            item.style.cursor = 'pointer';
+                            item.style.background = n.read ? 'white' : '#f0f9ff';
+                            item.style.transition = 'background-color 0.2s';
+                            
+                            item.onmouseover = () => { item.style.backgroundColor = '#f8fafc'; };
+                            item.onmouseout = () => { item.style.backgroundColor = n.read ? 'white' : '#f0f9ff'; };
+                            
+                            item.onclick = async () => {
+                                // Mark as read
+                                await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' });
+                                // Navigate
+                                if (n.link) window.location.href = n.link;
+                            };
+                            
+                            const icon = n.type === 'task_due' ? '📅' : (n.type === 'deal_milestone' ? '🏆' : 'ℹ️');
+                            const dateStr = new Date(n.created_at).toLocaleDateString();
+                            
+                            item.innerHTML = `
+                                <div style="display: flex; gap: 0.75rem;">
+                                    <div style="font-size: 1.2rem;">${icon}</div>
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 500; margin-bottom: 0.25rem; color: ${n.read ? 'inherit' : 'var(--primary)'}">${n.title}</div>
+                                        <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.25rem;">${n.message}</div>
+                                        <div style="font-size: 0.75rem; color: #94a3b8;">${dateStr}</div>
+                                    </div>
+                                </div>
+                            `;
+                            list.appendChild(item);
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch notifications', e);
+                }
+            }
+            
+            // Mark all read
+            markAllBtn.addEventListener('click', async function() {
+                try {
+                    await fetch('/api/notifications/mark-all-read', { method: 'POST' });
+                    fetchNotifications();
+                } catch (e) {
+                    console.error(e);
+                }
+            });
+
+            // Initial fetch
+            fetchNotifications();
+            
+            // Poll every 60 seconds
+            setInterval(fetchNotifications, 60000);
+        });
+    </script>
 </body>
 </html>
