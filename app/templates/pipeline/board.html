@@ -47,6 +47,21 @@
         }
     </style>
     <div class="pipeline-board">
+    {% set total_deals = namespace(count=0) %}
+    {% for stage in stages %}
+        {% set total_deals.count = total_deals.count + deals_by_stage[stage]|length %}
+    {% endfor %}
+
+    {% if total_deals.count == 0 %}
+    <div class="empty-state" style="width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        <h3>No deals in pipeline</h3>
+        <p>Create a deal to start tracking your sales process.</p>
+        <button onclick="document.getElementById('dealModal').showModal()" class="btn btn-primary" style="margin-top: 1rem;">+ New Deal</button>
+    </div>
+    {% else %}
     {% for stage in stages %}
     <div class="pipeline-column" id="col-{{ stage }}" data-stage="{{ stage }}" ondrop="drop(event)" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
         <div class="column-header">
@@ -76,6 +91,7 @@
         {% endfor %}
     </div>
     {% endfor %}
+    {% endif %}
 </div>
 
 <!-- New Deal Modal -->

@@ -1,6 +1,21 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<div class="breadcrumb">
+    <a href="/">Dashboard</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="/contacts">Contacts</a>
+    <span class="breadcrumb-separator">/</span>
+    <span>{{ contact.name }}</span>
+</div>
+<style>
+    .detail-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; }
+    .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) {
+        .detail-layout { grid-template-columns: 1fr; }
+        .fields-grid { grid-template-columns: 1fr; }
+    }
+</style>
 {% if message %}
 <div style="background-color: var(--success); color: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
     {{ message }}
@@ -17,7 +32,7 @@
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+<div class="detail-layout">
     <!-- Main Info -->
     <div>
         <div class="card">
@@ -42,7 +57,7 @@
                 </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="fields-grid">
                 <div>
                     <label>Email</label>
                     <div><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></div>

@@ -1,6 +1,13 @@
 {% extends "layout/base.html" %}
 
 {% block content %}
+<div class="breadcrumb">
+    <a href="/">Dashboard</a>
+    <span class="breadcrumb-separator">/</span>
+    <a href="/intel">Intel</a>
+    <span class="breadcrumb-separator">/</span>
+    <span>{{ analysis.company_name }}</span>
+</div>
 <style>
 .intel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
 .intel-box { background: var(--bg-secondary, #f8f9fa); padding: 1rem; border-radius: 6px; border: 1px solid var(--border); }

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from app.database import engine, Base, get_db, SessionLocal
 import app.routes as routes_module
 from app.routes import dashboard, contacts, pipeline, activities, intel, billing, notifications, automations, reports
@@ -9,6 +10,11 @@ from viv_auth import init_auth
 from viv_pay import init_pay
 
 app = FastAPI(title="CRM Pro")
+templates = Jinja2Templates(directory="app/templates")
+
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc):
+    return templates.TemplateResponse("404.html", {"request": request})
 
 # Health check (must be first)
 @app.get("/health")

@@ -416,29 +416,181 @@
 
         /* Responsive */
         @media (max-width: 768px) {
-          body {
-            flex-direction: column;
-          }
-          .sidebar {
+            body {
+                flex-direction: column;
+            }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -250px; /* Hide off-screen */
+                width: 250px;
+                height: 100vh;
+                z-index: 2000;
+                transition: left 0.3s ease-in-out;
+                flex-direction: column;
+                align-items: stretch;
+                padding: 0;
+            }
+            .sidebar.open {
+                left: 0;
+            }
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1999;
+            }
+            .sidebar-overlay.visible {
+                display: block;
+            }
+            .nav-links {
+                flex-direction: column;
+                flex-wrap: nowrap;
+                padding: 1rem;
+            }
+            .user-section {
+                display: block; /* Show again as it's in the drawer */
+            }
+            
+            /* Mobile Header */
+            .mobile-header {
+                display: flex !important;
+                align-items: center;
+                padding: 1rem;
+                background: var(--bg-dark);
+                color: white;
+                justify-content: space-between;
+            }
+            
+            .main-content {
+                padding: 1rem;
+                width: 100%;
+            }
+            
+            /* Tables */
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            /* Forms */
+            .form-group {
+                flex-direction: column;
+            }
+            
+            /* Pipeline */
+            .pipeline-board {
+                overflow-x: auto;
+                scroll-snap-type: x mandatory;
+                padding-right: 1rem; /* Padding for scroll */
+            }
+            .pipeline-column {
+                flex: 0 0 85vw; /* Show one column mostly */
+                scroll-snap-align: center;
+            }
+        }
+
+        /* Mobile Header (Hidden on Desktop) */
+        .mobile-header {
+            display: none;
+        }
+
+        /* Loading Spinner */
+        .spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            flex-direction: row;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
             align-items: center;
-            padding: 0.5rem;
-          }
-          .nav-links {
-            flex-direction: row;
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            color: var(--border);
+        }
+        .empty-state h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+        
+        /* Breadcrumbs */
+        .breadcrumb {
+            display: flex;
             align-items: center;
-            flex-wrap: wrap;
-          }
-          .user-section {
-            display: none; 
-          }
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        .breadcrumb a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-separator {
+            margin: 0 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* Focus States */
+        button:focus-visible, a:focus-visible, input:focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
         }
     </style>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%234f8ef7' rx='20'/><text x='50' y='50' font-family='sans-serif' font-weight='bold' font-size='40' fill='white' text-anchor='middle' dy='.3em'>CRM</text></svg>">
 </head>
 <body>
-    <div class="sidebar">
-        <div class="logo">CRM Pro</div>
+    <div class="spinner-overlay" id="loadingSpinner">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <div style="font-size: 1.5rem; cursor: pointer;" onclick="toggleSidebar()">☰</div>
+        <div style="font-weight: bold;">CRM Pro</div>
+        <div style="width: 24px;"></div> <!-- Spacer for centering -->
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <div class="sidebar" id="sidebar">
+        <div class="logo" style="display: flex; justify-content: space-between; align-items: center;">
+            CRM Pro
+            <span style="display: none; cursor: pointer;" class="mobile-close" onclick="toggleSidebar()">✕</span>
+        </div>
         <div class="nav-links">
             <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">
                 📊 Dashboard
@@ -598,6 +750,59 @@
             // Poll every 60 seconds
             setInterval(fetchNotifications, 60000);
         });
+
+        // Wrap tables for horizontal scrolling on mobile
+        document.querySelectorAll('table').forEach(table => {
+            if (!table.parentElement.classList.contains('table-container')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-container';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+        
+        // Mobile close button visibility logic is handled by CSS (display: none by default)
+        // I need to add the media query for it.
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 768px) {
+                .mobile-close { display: block !important; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Sidebar Toggle
+        window.toggleSidebar = function() { // Make global
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('visible');
+        }
+
+        // Loading Spinner Logic
+        const spinner = document.getElementById('loadingSpinner');
+        
+        // Show spinner on form submit
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', () => {
+                spinner.style.display = 'flex';
+            });
+        });
+
+        // Intercept Fetch API to show spinner (optional but nice)
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            // Only show for non-polling requests
+            const isPolling = args[0] && args[0].toString().includes('notifications');
+            if (!isPolling) spinner.style.display = 'flex';
+            
+            try {
+                const response = await originalFetch(...args);
+                return response;
+            } finally {
+                if (!isPolling) spinner.style.display = 'none';
+            }
+        };
     </script>
 </body>
 </html>

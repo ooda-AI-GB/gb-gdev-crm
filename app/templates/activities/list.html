@@ -33,6 +33,7 @@
         {% endif %}
     </form>
 
+    {% if activities %}
     <div class="timeline">
         {% for activity in activities %}
         <div class="timeline-item">
@@ -70,6 +71,16 @@
         </div>
         {% endfor %}
     </div>
+    {% else %}
+    <div class="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+        </svg>
+        <h3>No activities logged</h3>
+        <p>Keep track of your interactions by logging activities.</p>
+        <button onclick="document.getElementById('activityModal').showModal()" class="btn btn-primary" style="margin-top: 1rem;">+ New Activity</button>
+    </div>
+    {% endif %}
 </div>
 
 <!-- New Activity Modal -->
