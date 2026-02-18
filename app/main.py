@@ -45,10 +45,10 @@ routes_module.require_subscription = require_subscription
 routes_module.create_checkout = create_checkout
 routes_module.get_customer = get_customer
 
-# Auth bypass for dev/testing — set DEV_AUTH_BYPASS=true to skip login
+# Auth bypass for dev/testing -- set DEV_AUTH_BYPASS=true to skip login
 if os.environ.get("DEV_AUTH_BYPASS", "").lower() == "true":
     from types import SimpleNamespace
-    print("[AUTH] DEV_AUTH_BYPASS=true — all routes accessible without login")
+    print("[AUTH] DEV_AUTH_BYPASS=true -- all routes accessible without login")
     _fake_user = SimpleNamespace(id=1, email="dev@bypass.local")
     async def _bypass_auth(): return _fake_user
     async def _bypass_subscription(request: Request): return True
