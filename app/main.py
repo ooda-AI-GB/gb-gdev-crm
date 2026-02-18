@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -44,9 +45,18 @@ routes_module.require_subscription = require_subscription
 routes_module.create_checkout = create_checkout
 routes_module.get_customer = get_customer
 
-# Override dependency getters
-app.dependency_overrides[routes_module.get_current_user] = require_auth
-app.dependency_overrides[routes_module.get_active_subscription] = require_active_subscription
+# Auth bypass for dev/testing — set DEV_AUTH_BYPASS=true to skip login
+if os.environ.get("DEV_AUTH_BYPASS", "").lower() == "true":
+    from types import SimpleNamespace
+    print("[AUTH] DEV_AUTH_BYPASS=true — all routes accessible without login")
+    _fake_user = SimpleNamespace(id=1, email="dev@bypass.local")
+    async def _bypass_auth(): return _fake_user
+    async def _bypass_subscription(request: Request): return True
+    app.dependency_overrides[routes_module.get_current_user] = _bypass_auth
+    app.dependency_overrides[routes_module.get_active_subscription] = _bypass_subscription
+else:
+    app.dependency_overrides[routes_module.get_current_user] = require_auth
+    app.dependency_overrides[routes_module.get_active_subscription] = require_active_subscription
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
