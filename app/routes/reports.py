@@ -194,10 +194,23 @@ async def reports_index(
     avg_won = total_won_val / won_count if won_count else 0
     avg_lost = total_lost_val / lost_count if lost_count else 0
 
-    try:
-        return templates.TemplateResponse("reports/index.html", {
-            "request": request,
-            "user": user,
+    # Build win/loss chart datasets for Chart.js
+    win_loss_datasets = [
+        {
+            "label": "Won",
+            "data": [monthly_stats[m]["won"] for m in win_loss_labels],
+            "backgroundColor": "#34c759"
+        },
+        {
+            "label": "Lost",
+            "data": [monthly_stats[m]["lost"] for m in win_loss_labels],
+            "backgroundColor": "#ff3b30"
+        }
+    ]
+
+    return templates.TemplateResponse("reports/index.html", {
+        "request": request,
+        "user": user,
         "start_date": start_date,
         "end_date": end_date,
         "pipeline_stats": pipeline_stats,
@@ -208,13 +221,11 @@ async def reports_index(
         "top_contacts": top_contacts,
         "win_loss_labels": win_loss_labels,
         "monthly_stats": monthly_stats,
+        "win_loss_datasets": win_loss_datasets,
         "win_rate_trend": win_rate_trend,
         "avg_won": avg_won,
-            "avg_lost": avg_lost
-        })
-    except Exception as e:
-        import traceback
-        return HTMLResponse(f"<pre>{traceback.format_exc()}</pre>", status_code=500)
+        "avg_lost": avg_lost
+    })
 
 @router.get("/reports/{report_type}/pdf")
 async def export_pdf(
