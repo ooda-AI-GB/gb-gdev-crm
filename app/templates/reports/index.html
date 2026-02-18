@@ -1,0 +1,261 @@
+{% extends "layout/base.html" %}
+
+{% block content %}
+<div class="top-bar">
+    <h1>Reports</h1>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+        <form method="get" action="/reports" style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="date" name="start" value="{{ start_date }}" class="form-control" style="padding: 0.4rem;">
+            <span>to</span>
+            <input type="date" name="end" value="{{ end_date }}" class="form-control" style="padding: 0.4rem;">
+            <button type="submit" class="btn btn-primary btn-sm">Update</button>
+        </form>
+        <button id="exportPdfBtn" class="btn btn-outline btn-sm">📄 Export PDF</button>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div style="display: flex; border-bottom: 1px solid var(--border); background: #f8fafc;">
+        <div class="tab-btn active" onclick="switchTab('pipeline')" style="padding: 1rem 1.5rem; cursor: pointer; font-weight: 600; border-bottom: 3px solid var(--primary);">Pipeline Report</div>
+        <div class="tab-btn" onclick="switchTab('activity')" style="padding: 1rem 1.5rem; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent;">Activity Report</div>
+        <div class="tab-btn" onclick="switchTab('win_loss')" style="padding: 1rem 1.5rem; cursor: pointer; font-weight: 600; border-bottom: 3px solid transparent;">Win/Loss Report</div>
+    </div>
+
+    <div class="tab-content" id="tab-pipeline" style="padding: 1.5rem;">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">${{ "{:,.0f}".format(projected_revenue) }}</div>
+                <div class="stat-label">Projected Revenue</div>
+            </div>
+        </div>
+
+        <h3>Pipeline Breakdown</h3>
+        <table style="width: 100%; margin-top: 1rem;">
+            <thead>
+                <tr>
+                    <th>Stage</th>
+                    <th>Count</th>
+                    <th style="text-align: right;">Total Value</th>
+                    <th style="text-align: right;">Avg Deal Size</th>
+                    <th style="text-align: right;">Avg Time in Stage (Days)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stage, stats in pipeline_stats.items() %}
+                <tr>
+                    <td><span class="badge badge-{{ stage }}">{{ stage.replace('_', ' ') }}</span></td>
+                    <td>{{ stats.count }}</td>
+                    <td style="text-align: right;">${{ "{:,.0f}".format(stats.value) }}</td>
+                    <td style="text-align: right;">${{ "{:,.0f}".format(stats.avg_size) }}</td>
+                    <td style="text-align: right;">{{ "{:.1f}".format(stats.avg_time) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="tab-content" id="tab-activity" style="display: none; padding: 1.5rem;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+            <div>
+                <h3>Activity Trends (Last 8 Weeks)</h3>
+                <div style="height: 300px; margin-bottom: 2rem;">
+                    <canvas id="activityChart"></canvas>
+                </div>
+                
+                <h3>Weekly Breakdown</h3>
+                <table style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Week</th>
+                            {% for t in ["call", "email", "meeting", "note", "task"] %}
+                            <th style="text-align: center;">{{ t|capitalize }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for week in week_keys %}
+                        <tr>
+                            <td>{{ week }}</td>
+                            {% for t in ["call", "email", "meeting", "note", "task"] %}
+                            <td style="text-align: center;">{{ activity_weeks[week][t] }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div>
+                <h3>Top 5 Most Active Contacts</h3>
+                <div class="card" style="padding: 0; margin-top: 1rem;">
+                    <table style="margin: 0;">
+                        <thead>
+                            <tr>
+                                <th>Contact</th>
+                                <th style="text-align: right;">Activities</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in top_contacts %}
+                            <tr>
+                                <td>{{ c.name }}</td>
+                                <td style="text-align: right;">{{ c.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tab-content" id="tab-win_loss" style="display: none; padding: 1.5rem;">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value">${{ "{:,.0f}".format(avg_won) }}</div>
+                <div class="stat-label">Avg Won Deal Size</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${{ "{:,.0f}".format(avg_lost) }}</div>
+                <div class="stat-label">Avg Lost Deal Size</div>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+            <div>
+                <h3>Win/Loss by Month</h3>
+                <div style="height: 300px;">
+                    <canvas id="winLossChart"></canvas>
+                </div>
+            </div>
+            <div>
+                <h3>Win Rate Trend (%)</h3>
+                <div style="height: 300px;">
+                    <canvas id="winRateChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 2rem;">Monthly Details</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Won Count</th>
+                    <th>Lost Count</th>
+                    <th style="text-align: right;">Won Value</th>
+                    <th style="text-align: right;">Lost Value</th>
+                    <th style="text-align: right;">Win Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in win_loss_labels %}
+                <tr>
+                    <td>{{ m }}</td>
+                    <td>{{ monthly_stats[m].won }}</td>
+                    <td>{{ monthly_stats[m].lost }}</td>
+                    <td style="text-align: right;">${{ "{:,.0f}".format(monthly_stats[m].won_val) }}</td>
+                    <td style="text-align: right;">${{ "{:,.0f}".format(monthly_stats[m].lost_val) }}</td>
+                    <td style="text-align: right;">
+                        {% set total = monthly_stats[m].won + monthly_stats[m].lost %}
+                        {% if total > 0 %}
+                            {{ "{:.1f}".format((monthly_stats[m].won / total) * 100) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let currentTab = 'pipeline';
+
+    function switchTab(tab) {
+        currentTab = tab;
+        // Buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.style.borderBottomColor = 'transparent';
+            btn.classList.remove('active');
+        });
+        const activeBtn = document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`);
+        activeBtn.style.borderBottomColor = 'var(--primary)';
+        activeBtn.classList.add('active');
+
+        // Content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.style.display = 'none';
+        });
+        document.getElementById(`tab-${tab}`).style.display = 'block';
+    }
+
+    // PDF Export
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+        const start = document.querySelector('input[name="start"]').value;
+        const end = document.querySelector('input[name="end"]').value;
+        window.location.href = `/reports/${currentTab}/pdf?start=${start}&end=${end}`;
+    });
+
+    // Charts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Activity Chart
+        const actCtx = document.getElementById('activityChart').getContext('2d');
+        new Chart(actCtx, {
+            type: 'bar',
+            data: {{ activity_chart | tojson }},
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true }
+                }
+            }
+        });
+
+        // Win/Loss Chart
+        const wlCtx = document.getElementById('winLossChart').getContext('2d');
+        new Chart(wlCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ win_loss_labels | tojson }},
+                datasets: {{ win_loss_datasets | tojson }}
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Win Rate Chart
+        const wrCtx = document.getElementById('winRateChart').getContext('2d');
+        new Chart(wrCtx, {
+            type: 'line',
+            data: {
+                labels: {{ win_loss_labels | tojson }},
+                datasets: [{
+                    label: 'Win Rate (%)',
+                    data: {{ win_rate_trend | tojson }},
+                    borderColor: '#4f8ef7',
+                    backgroundColor: '#4f8ef7',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, max: 100 }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

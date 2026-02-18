@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from app.database import engine, Base, get_db, SessionLocal
 import app.routes as routes_module
-from app.routes import dashboard, contacts, pipeline, activities, intel, billing, notifications, automations
+from app.routes import dashboard, contacts, pipeline, activities, intel, billing, notifications, automations, reports
 from app.seed import seed_crm_data
 from viv_auth import init_auth
 from viv_pay import init_pay
@@ -54,6 +54,7 @@ app.include_router(intel.router)
 app.include_router(billing.router)
 app.include_router(notifications.router)
 app.include_router(automations.router)
+app.include_router(reports.router)
 
 # Startup event
 @app.on_event("startup")
