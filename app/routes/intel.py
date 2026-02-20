@@ -12,6 +12,8 @@ from pydantic import BaseModel
 from google import genai
 from datetime import datetime, timezone
 
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-flash-preview")
+
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
@@ -114,7 +116,7 @@ async def _perform_analysis(company_name: str, analysis_type: str, user, db: Ses
     Ensure the output is valid JSON. Do not include markdown formatting for the JSON block itself."""
     
     try:
-        response = client.models.generate_content(model="gemini-3-pro-preview", contents=prompt)
+        response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
         content = response.text or ""
         
         # Clean up JSON if wrapped in markdown
@@ -138,7 +140,7 @@ async def _perform_analysis(company_name: str, analysis_type: str, user, db: Ses
                 company_name=company_name,
                 analysis_type=analysis_type,
                 content=clean_content,
-                model_used="gemini-3-pro-preview",
+                model_used=GEMINI_MODEL,
                 requested_by=str(user.email),
                 analysis_version="2.0"
             )
